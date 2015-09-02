@@ -2,9 +2,16 @@ from evernote.api.client import EvernoteClient
 from evernote.edam.notestore import NoteStore
 from evernote.edam.notestore.ttypes import NoteFilter
 from evernote.edam.type.ttypes import NoteSortOrder
+from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
 from datetime import datetime
 
-# This whole file needs to be restructured but it is currently working so I will continue with it and refactor later
+
+def check_if_valid_evernote_time(time_string):
+    try:
+        datetime.strptime(time_string, '%Y%m%dT%H%M%S')
+    except ValueError:
+        raise EvernoteConnectorException("The given last-successful-evernote-check-time was of an invalid format")
+
 
 class Event():
     def __init__(self, title, date, startTime, endTime, notes):
@@ -15,31 +22,42 @@ class Event():
         self.notes = notes
 
 
+class EvernoteConnectorException(Exception):
+    def __init__(self, msg):
+        self.msg = msg
+
+
 class EvernoteConnector(EvernoteClient):
     def __init__(self, token, sandbox):
         super(EvernoteConnector, self).__init__(token=token, sandbox=sandbox)
-        self.last_check_time = self.get_last_check_time()
-        self.note_store = self.get_note_store()
         self.auth_token = token
 
-    def get_new_events(self):
+    def get_new_events(self, since="20150101T000000"):
 
-        noteFilter = self.get_new_event_note_filter()
-        spec = NoteStore.NotesMetadataResultSpec()
+        try:
 
-        newEventNoteList = self.note_store.findNotesMetadata(self.auth_token, noteFilter, 0, 5, spec)
+            check_if_valid_evernote_time(since)
 
-        events = []
-        for noteMetadata in newEventNoteList.notes:
-            fullNote = self.note_store.getNote(self.auth_token, noteMetadata.guid, True, False, False, False)
+            new_event_note_filter = self.get_new_event_note_filter(since,"Events")
 
-            events.append(self.convert_note_to_event(fullNote))
+            event_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token, new_event_note_filter, 0, 5, NoteStore.NotesMetadataResultSpec())
 
-        return events
+            events = []
+            for note_metadata in event_metadata_list.notes:
+                full_note = self.get_note_store().getNote(self.auth_token, note_metadata.guid, True, False, False, False)
+
+                events.append(self.convert_note_to_event(full_note))
+
+            return events
+
+        except (EDAMUserException, EDAMSystemException, EDAMNotFoundException) as e:
+            # currently I am not managing what to do if the API call is bad
+            # I will need to consider things like rate limiting and token expiry
+            raise EvernoteConnectorException("There was an error talking to the API: " + e.msg)
 
     def convert_note_to_event(self, event_note):
-        # we expect the title to be of the form "2000-10-01 1600-1700 Title Name..."
-        # clearly need error handling here as it may not be in that format at all
+
+        self.check_if_valid_event_note(event_note)
 
         split_title = event_note.title.split(" ", 2)
 
@@ -52,32 +70,50 @@ class EvernoteConnector(EvernoteClient):
 
         return Event(event_note.title, date_timestamp, start_timestamp, end_timestamp, event_note.content)
 
-    def get_new_event_note_filter(self):
+    def get_new_event_note_filter(self,since,notebook_name):
 
-        self.save_check_time(datetime.now().strftime('%Y%m%dT%H%M%S'))
+        print(since)
 
-        for n in self.note_store.listNotebooks():
-            if n.name == 'Events':
-                eventNotebookGuid = n.guid
+        for notebook in self.get_note_store().listNotebooks():
+            if notebook.name == notebook_name:
+                event_notebook_guid = notebook.guid
                 break
 
-        noteFilter = NoteFilter()
-        noteFilter.order = NoteSortOrder.CREATED
-        noteFilter.ascending = True
-        noteFilter.notebookGuid = eventNotebookGuid
-        #noteFilter.words = "created:" + self.last_check_time
+        if event_notebook_guid == None:
+            raise EvernoteConnectorException("Unable to find a notebook with the name '" + notebook_name + "'")
 
-        return noteFilter
+        note_filter = NoteFilter()
+        note_filter.order = NoteSortOrder.CREATED
+        note_filter.ascending = True
+        note_filter.notebookGuid = event_notebook_guid
+        note_filter.words = "created:" + since
 
-    def get_last_check_time(self):
-        # what happens if file does not exist?
-        # or file is empty
-        # or time is invalid?
+        return note_filter
 
-        with open('last_check_time.txt', 'r') as f:
-            last_check_time = f.readline()
-        return last_check_time
+    def check_if_valid_event_note(self,note):
+        # we expect the title to be of the form "2000-10-01 1600-1700 Title Name..."
 
-    def save_check_time(self, savedTime):
-        with open('last_check_time.txt', 'w') as f:
-            f.write(str(savedTime))
+        try:
+
+            split_title = note.title.split(" ", 2)
+
+            if len(split_title) != 3:
+                raise ValueError
+
+            datetime.strptime(split_title[0], '%Y-%m-%d')
+
+            if len(split_title[1].split("-")) != 2:
+                raise ValueError
+
+            start_time = split_title[1].split("-")[0]
+            end_time = split_title[1].split("-")[1]
+
+            datetime.strptime(start_time, '%H%M')
+            datetime.strptime(end_time, '%H%M')
+
+            if split_title[2] == "":
+                raise ValueError
+
+        except ValueError:
+            raise EvernoteConnectorException("The title of note '" + note.title + "' is invalid and cannot be parsed for event details")
+
