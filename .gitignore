@@ -1,0 +1,6 @@
+api_settings.py
+api_settings.pyc
+*.pyc
+.idea
+.idea/*
+last_check_time.txt
