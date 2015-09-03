@@ -1,0 +1,3 @@
+[submodule "evernote_api_submodule"]
+	path = evernote_api_submodule
+	url = git://github.com/evernote/evernote-sdk-python/

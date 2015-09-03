@@ -5,6 +5,4 @@ A secondary goal is to remind me how to code in python, as well as improve my kn
 
 Setup process so far on Windows:
 * Install python 2.7.10 32-bit
-* Download evernote python SDK
-* Run 'python setup.py install' to evernote SDK
-* Pycurl has picked up the evernote modules/classes
+* Run 'python setup.py install' in the evernote_api submodule
