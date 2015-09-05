@@ -3,7 +3,9 @@ from evernote.edam.notestore import NoteStore
 from evernote.edam.notestore.ttypes import NoteFilter
 from evernote.edam.type.ttypes import NoteSortOrder
 from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
+
 from datetime import datetime
+import logging
 
 
 def check_if_valid_evernote_time(time_string):
@@ -14,12 +16,12 @@ def check_if_valid_evernote_time(time_string):
 
 
 class Event():
-    def __init__(self, title, date, startTime, endTime, notes):
+    def __init__(self, title, date, start_time, end_time, content):
         self.title = title
         self.date = date
-        self.startTime = startTime
-        self.endTime = endTime
-        self.notes = notes
+        self.start_time = start_time
+        self.end_time = end_time
+        self.content = content
 
 
 class EvernoteConnectorException(Exception):
@@ -32,7 +34,7 @@ class EvernoteConnector(EvernoteClient):
         super(EvernoteConnector, self).__init__(token=token, sandbox=sandbox)
         self.auth_token = token
 
-    def get_new_events(self, since="20150101T000000"):
+    def get_new_events(self, since):
 
         try:
 
@@ -68,18 +70,16 @@ class EvernoteConnector(EvernoteClient):
         start_timestamp = datetime.strptime(split_title[0] + " " + start_string, '%Y-%m-%d %H%M')
         end_timestamp = datetime.strptime(split_title[0] + " " + end_string, '%Y-%m-%d %H%M')
 
-        return Event(event_note.title, date_timestamp, start_timestamp, end_timestamp, event_note.content)
+        return Event(split_title[2], date_timestamp, start_timestamp, end_timestamp, event_note.content)
 
     def get_new_event_note_filter(self,since,notebook_name):
-
-        print(since)
 
         for notebook in self.get_note_store().listNotebooks():
             if notebook.name == notebook_name:
                 event_notebook_guid = notebook.guid
                 break
 
-        if event_notebook_guid == None:
+        if event_notebook_guid is None:
             raise EvernoteConnectorException("Unable to find a notebook with the name '" + notebook_name + "'")
 
         note_filter = NoteFilter()

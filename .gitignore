@@ -1,6 +1,9 @@
-api_settings.py
-api_settings.pyc
-*.pyc
-.idea
-.idea/*
+settings.py
 last_check_time.txt
+
+*.creds
+*.pyc
+.idea*
+*.log
+
+
