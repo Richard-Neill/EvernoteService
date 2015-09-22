@@ -58,6 +58,8 @@ class GoogleCalendarConnector():
                'timeZone': 'Europe/London'}
 
         content_root = cElementTree.fromstring(event.content)
+
+        content = None
         for child in content_root:
             content = child.text
 

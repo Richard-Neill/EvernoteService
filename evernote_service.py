@@ -13,7 +13,7 @@ def get_last_successful_check_time():
 
     with open('last_check_time.txt', 'r') as f:
         last_check_time = f.readline()
-    return last_check_time
+    return last_check_time.strip()
 
 
 def save_successful_check_time(time):
