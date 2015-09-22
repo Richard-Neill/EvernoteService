@@ -7,3 +7,4 @@ Setup process on Windows:
 * Install python 2.7.10 32-bit
 * Run 'python setup.py install' in the evernote_api submodule
 * Run 'pip install --upgrade google-api-python-client'
+* Run 'pip install schedule'

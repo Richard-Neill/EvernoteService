@@ -28,7 +28,7 @@ class GoogleCalendarConnector():
         parser = argparse.ArgumentParser(parents=[tools.argparser])
         flags = parser.parse_args(args=[])
 
-        storage = Storage('google_oauth2.creds')
+        storage = Storage(credentials_file)
         credentials = storage.get()
         if credentials is None or credentials.invalid:
             credentials = tools.run_flow(flow, storage, flags)

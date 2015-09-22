@@ -46,6 +46,7 @@ class EvernoteConnector(EvernoteClient):
 
             events = []
             for note_metadata in event_metadata_list.notes:
+
                 full_note = self.get_note_store().getNote(self.auth_token, note_metadata.guid, True, False, False, False)
 
                 events.append(self.convert_note_to_event(full_note))
