@@ -8,3 +8,19 @@ Setup process on Windows:
 * Run 'python setup.py install' in the evernote_api submodule
 * Run 'pip install --upgrade google-api-python-client'
 * Run 'pip install schedule'
+
+To run the service it is just:
+* python evernote_service.py
+
+The settings.py file must be of the form:
+
+```python
+EVERNOTE_AUTH_TOKEN = "[token]"
+EVERNOTE_SANDBOX_MODE = True
+
+GOOGLE_CREDENTIALS_FILE='google_oauth2.creds'
+
+CHECK_TIME = "03:00"
+LOGGING_LEVEL = 10 # this is value of logging.DEBUG
+LOG_LOCATION = 'evernote_service.log'
+```
