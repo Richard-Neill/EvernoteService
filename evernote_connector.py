@@ -10,7 +10,7 @@ import logging
 
 def check_if_valid_evernote_time(time_string):
     try:
-        datetime.strptime(time_string, '%Y%m%dT%H%M%S')
+        datetime.strptime(time_string.strip(), '%Y%m%dT%H%M%S')
     except ValueError:
         raise EvernoteConnectorException("The given last-successful-evernote-check-time was of an invalid format")
 
