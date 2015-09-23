@@ -23,17 +23,19 @@ def save_successful_check_time(time):
 
 def run():
 
-    # Get new events from Evernote
+    current_check_time = None
 
+    # Get new events from Evernote
     logging.info("Getting new events from Evernote")
     evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
     try:
         current_check_time = datetime.now().strftime("%Y%m%dT%H%M%S")
-        logging.debug("Last successful check was " + get_last_successful_check_time())
+        last_successful_check_time = get_last_successful_check_time()
 
-        events = evernote_client.get_new_events(since=get_last_successful_check_time())
-        save_successful_check_time(current_check_time)
-        logging.debug("Evernote connection was successful, saved check time as " + current_check_time)
+        logging.debug("Last successful check was " + last_successful_check_time)
+
+        events = evernote_client.get_new_events(since=last_successful_check_time)
+        logging.debug("Evernote connection was successful")
 
     except EvernoteConnectorException as e:
         logging.critical("There was an error with the EvernoteConnector: " + e.msg)
@@ -43,7 +45,7 @@ def run():
 
     for event in events:
         logging.debug('StartTime: ' + event.start_time.strftime('%Y-%m-%d %H%M') +
-                      ', EndTime: ' + event.end_time.strftime('&Y-%m-%d %H%M') +
+                      ', EndTime: ' + event.end_time.strftime('%Y-%m-%d %H%M') +
                       ", Title: '" + event.title + "'")
 
     # Add new events to Google Calender
@@ -53,7 +55,8 @@ def run():
         google_client = GoogleCalendarConnector(credentials_file=settings.GOOGLE_CREDENTIALS_FILE)
         google_client.add_new_events(events)
 
-    logging.info('Complete')
+    save_successful_check_time(current_check_time)
+    logging.info('Complete, saved check time as ' + current_check_time)
 
 # Initialise logging
 
@@ -63,5 +66,11 @@ logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL
 schedule.every().day.at(settings.CHECK_TIME).do(run)
 
 while True:
-    schedule.run_pending()
-    time.sleep(1)
+    try:
+        schedule.run_pending()
+        time.sleep(1)
+    except Exception as e:
+        logging.critical("There was a general error:" + e.msg)
+        exit(1)
+
+    
