@@ -63,6 +63,17 @@ def run():
 logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL,
                     format='%(asctime)s [%(levelname)s]: %(message)s')
 
+# Run once when process is started
+
+try:
+    run()
+except Exception as e:
+    logging.critical("There was a general error:")
+    logging.critical(e)
+    exit(1)
+
+# Then schedule it to run on its time
+
 schedule.every().day.at(settings.CHECK_TIME).do(run)
 
 while True:
@@ -70,7 +81,7 @@ while True:
         schedule.run_pending()
         time.sleep(1)
     except Exception as e:
-        logging.critical("There was a general error:" + e.msg)
+        logging.critical("There was a general error:")
+        logging.critical(e)
         exit(1)
 
-    

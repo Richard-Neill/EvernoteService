@@ -5,8 +5,7 @@ from evernote.edam.type.ttypes import NoteSortOrder
 from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
 
 from datetime import datetime
-import logging
-
+import json
 
 def check_if_valid_evernote_time(time_string):
     try:
@@ -119,3 +118,73 @@ class EvernoteConnector(EvernoteClient):
         except ValueError:
             raise EvernoteConnectorException("The title of note '" + note.title + "' is invalid and cannot be parsed for event details")
 
+
+    def get_stored_goal_states(self):
+        with open('stored_goal_states.json') as f:
+            stored_goal_states = json.load(f)
+        return stored_goal_states
+
+    def save_stored_goal_states(self,stored_states):
+        with open('stored_goal_states.json', 'w') as f:
+            json.dump(stored_states, f)
+
+    # This should work but the moved notes aren't being found by the API
+    def process_goal_updates(self):
+
+        stored_goal_states = self.get_stored_goal_states()
+
+        note_filter = NoteFilter()
+
+        # Get all the goals on Evernote
+        for notebook in self.get_note_store().listNotebooks():
+
+            if notebook.name not in ["Backlog","Current","Complete","Dropped"]:
+                continue
+
+            note_filter.notebookGuid = notebook.guid
+            event_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token,
+                                                                          note_filter, 0, 5,
+                                                                          NoteStore.NotesMetadataResultSpec())
+
+            # For each goal
+            for note_metadata in event_metadata_list.notes:
+
+                # Check if the goal is new or has changed state (moved from another notebook)
+                if note_metadata.guid in stored_goal_states[notebook.name]:
+                    # the goal is in the same state as it was the last time we checked
+                    continue
+                else:
+                    # the goal is new, or it has changed state
+                    # search to see if it was previously in a different notebook
+                    other_notebooks = ["Backlog","Current","Complete","Dropped"]
+                    other_notebooks.remove(notebook.name)
+
+                    goal_has_moved = None
+
+                    for previous_notebook in other_notebooks:
+                        if note_metadata.guid in stored_goal_states[previous_notebook]:
+                            # We know the note used to be in this notebook, so annotate the note and update what we know
+
+                            annotation = datetime.now().strftime("%Y-%m-%d") \
+                                         + " Moved from " + previous_notebook + " to " + notebook.name
+                            self.annotate_note(note_metadata.guid,annotation)
+
+                            stored_goal_states[previous_notebook].remove(note_metadata.guid)
+                            stored_goal_states[notebook.name].append(note_metadata.guid)
+
+                            goal_has_moved = True
+                            break
+
+                    if goal_has_moved is None:
+                        # The note has been newly added
+                        # So annotate the note and save the state of the note locally
+
+                        annotation = datetime.now().strftime("%Y-%m-%d") + " Added to " + notebook.name
+                        self.annotate_note(note_metadata.guid,annotation)
+
+                        stored_goal_states[notebook.name].append(note_metadata.guid)
+
+        self.save_stored_goal_states(stored_goal_states)
+
+    def annotate_note(self, note_guid, annotation):
+        print("Annotating note " + note_guid + " with \"" + annotation + "\"")
