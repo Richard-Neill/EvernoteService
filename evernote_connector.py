@@ -41,7 +41,8 @@ class EvernoteConnector(EvernoteClient):
 
             new_event_note_filter = self.get_new_event_note_filter(since,"Events")
 
-            event_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token, new_event_note_filter, 0, 5, NoteStore.NotesMetadataResultSpec())
+            event_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token, new_event_note_filter, 0, 50, NoteStore.NotesMetadataResultSpec())
+            # Assuming that I won't create more than 50 events between checks (at the time of writing, checks are once per day)
 
             events = []
             for note_metadata in event_metadata_list.notes:
@@ -87,7 +88,7 @@ class EvernoteConnector(EvernoteClient):
         note_filter.order = NoteSortOrder.CREATED
         note_filter.ascending = True
         note_filter.notebookGuid = event_notebook_guid
-        note_filter.words = "created:" + since
+        note_filter.words = "created:" + since + "Z"
 
         return note_filter
 

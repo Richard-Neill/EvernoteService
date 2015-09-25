@@ -5,15 +5,20 @@ from gcalender_connector import GoogleCalendarConnector
 import schedule
 import time
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
-
+# Returns timestamp in GMT according to settings.GMT_OFFSET
 def get_last_successful_check_time():
 
     with open('last_check_time.txt', 'r') as f:
         last_check_time = f.readline()
-    return last_check_time.strip()
+
+    # Need to modify the number per the GMT offset
+    timestamp = datetime.strptime(last_check_time.strip(),"%Y%m%dT%H%M%S")
+    corrected_timestamp = timestamp - timedelta(hours=settings.GMT_OFFSET)
+
+    return corrected_timestamp.strftime("%Y%m%dT%H%M%S")
 
 
 def save_successful_check_time(time):
@@ -23,6 +28,7 @@ def save_successful_check_time(time):
 
 def run():
 
+    print("Running")
     current_check_time = None
 
     # Get new events from Evernote
@@ -58,30 +64,24 @@ def run():
     save_successful_check_time(current_check_time)
     logging.info('Complete, saved check time as ' + current_check_time)
 
+    print("Complete")
+
 # Initialise logging
 
 logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL,
                     format='%(asctime)s [%(levelname)s]: %(message)s')
 
-# Run once when process is started
+
+# Run once when process is started then schedule it to run on its time
+schedule.every().day.at(settings.CHECK_TIME).do(run)
 
 try:
     run()
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 except Exception as e:
     logging.critical("There was a general error:")
     logging.critical(e)
     exit(1)
-
-# Then schedule it to run on its time
-
-schedule.every().day.at(settings.CHECK_TIME).do(run)
-
-while True:
-    try:
-        schedule.run_pending()
-        time.sleep(1)
-    except Exception as e:
-        logging.critical("There was a general error:")
-        logging.critical(e)
-        exit(1)
 
