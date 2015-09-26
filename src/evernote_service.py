@@ -100,7 +100,7 @@ def process_goals():
 def run():
 
     print("Processing Events")
-    #process_events()
+    process_events()
     print("Completed Events Processing")
 
     print("Processing Goals")
