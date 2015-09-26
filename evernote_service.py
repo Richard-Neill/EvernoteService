@@ -6,13 +6,18 @@ import schedule
 import time
 
 from datetime import datetime, timedelta
+from os import path
 import logging
+import json
 
 # Returns timestamp in GMT according to settings.GMT_OFFSET
-def get_last_successful_check_time():
-
-    with open('last_check_time.txt', 'r') as f:
-        last_check_time = f.readline()
+def get_last_successful_check_time(latest_check_time_location):
+    if path.exists(latest_check_time_location):
+        with open(latest_check_time_location, 'r') as f:
+            last_check_time = f.readline()
+    else:
+        logging.critical("Couldn't find the latest check time at " + latest_check_time_location)
+        exit(1)
 
     # Need to modify the number per the GMT offset
     timestamp = datetime.strptime(last_check_time.strip(),"%Y%m%dT%H%M%S")
@@ -21,14 +26,13 @@ def get_last_successful_check_time():
     return corrected_timestamp.strftime("%Y%m%dT%H%M%S")
 
 
-def save_successful_check_time(time):
-    with open('last_check_time.txt', 'w') as f:
+def save_successful_check_time(latest_check_time_location,time):
+    with open(latest_check_time_location, 'w') as f:
         f.write(str(time))
 
 
-def run():
+def process_events():
 
-    print("Running")
     current_check_time = None
 
     # Get new events from Evernote
@@ -36,7 +40,7 @@ def run():
     evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
     try:
         current_check_time = datetime.now().strftime("%Y%m%dT%H%M%S")
-        last_successful_check_time = get_last_successful_check_time()
+        last_successful_check_time = get_last_successful_check_time(settings.LATEST_CHECK_TIME_LOCATION)
 
         logging.debug("Last successful check was " + last_successful_check_time)
 
@@ -61,10 +65,47 @@ def run():
         google_client = GoogleCalendarConnector(credentials_file=settings.GOOGLE_CREDENTIALS_FILE)
         google_client.add_new_events(events)
 
-    save_successful_check_time(current_check_time)
-    logging.info('Complete, saved check time as ' + current_check_time)
+    save_successful_check_time(settings.LATEST_CHECK_TIME_LOCATION,current_check_time)
+    logging.info('Completed processing events, saved check time as ' + current_check_time)
 
-    print("Complete")
+def get_stored_goal_states(stored_states_location):
+
+    if path.exists(stored_states_location):
+        with open(stored_states_location) as f:
+            stored_goal_states = json.load(f)
+    else:
+        stored_goal_states = {}
+        stored_goal_states["Backlog"] = []
+        stored_goal_states["Current"] = []
+        stored_goal_states["Complete"] = []
+        stored_goal_states["Dropped"] = []
+
+    return stored_goal_states
+
+def save_stored_goal_states(stored_states_location,states_to_store):
+    with open(stored_states_location, 'w') as f:
+        json.dump(states_to_store, f)
+
+def process_goals():
+
+    previous_goal_states = get_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION)
+
+    logging.info("Processing goal state-changes")
+    evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
+    new_goal_states = evernote_client.process_goal_updates(previous_goal_states)
+
+    save_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION,new_goal_states)
+    logging.info("Completed processing goals")
+
+def run():
+
+    print("Processing Events")
+    process_events()
+    print("Completed Events Processing")
+
+    print("Processing Goals")
+    process_goals()
+    print("Completed Goals Processing")
 
 # Initialise logging
 

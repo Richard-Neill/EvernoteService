@@ -4,8 +4,8 @@ from evernote.edam.notestore.ttypes import NoteFilter
 from evernote.edam.type.ttypes import NoteSortOrder
 from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
 
-from datetime import datetime
-import json
+from datetime import datetime, timedelta
+import logging
 
 def check_if_valid_evernote_time(time_string):
     try:
@@ -119,36 +119,43 @@ class EvernoteConnector(EvernoteClient):
         except ValueError:
             raise EvernoteConnectorException("The title of note '" + note.title + "' is invalid and cannot be parsed for event details")
 
+    def get_all_notes_metadata(self, auth_token, note_filter, metadata_spec):
 
-    def get_stored_goal_states(self):
-        with open('stored_goal_states.json') as f:
-            stored_goal_states = json.load(f)
-        return stored_goal_states
+        all_notes = []
+        start_index = 0
+        result_size = 50
 
-    def save_stored_goal_states(self,stored_states):
-        with open('stored_goal_states.json', 'w') as f:
-            json.dump(stored_states, f)
+        there_are_more_notes = True
+        while there_are_more_notes:
 
-    # This should work but the moved notes aren't being found by the API
-    def process_goal_updates(self):
+            note_metadata_list = self.get_note_store().findNotesMetadata(auth_token,
+                                                                         note_filter, start_index, result_size,
+                                                                         metadata_spec)
+            all_notes = all_notes + note_metadata_list.notes
 
-        stored_goal_states = self.get_stored_goal_states()
+            if note_metadata_list.totalNotes > start_index + result_size:
+                there_are_more_notes = True
+                start_index += result_size
+            else:
+                there_are_more_notes = False
 
+        return all_notes
+
+    def process_goal_updates(self, stored_goal_states):
         note_filter = NoteFilter()
 
-        # Get all the goals on Evernote
+        # Get all the goals
         for notebook in self.get_note_store().listNotebooks():
 
             if notebook.name not in ["Backlog","Current","Complete","Dropped"]:
                 continue
 
             note_filter.notebookGuid = notebook.guid
-            event_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token,
-                                                                          note_filter, 0, 5,
-                                                                          NoteStore.NotesMetadataResultSpec())
+
+            note_metadata_list = self.get_all_notes_metadata(self.auth_token,note_filter,NoteStore.NotesMetadataResultSpec())
 
             # For each goal
-            for note_metadata in event_metadata_list.notes:
+            for note_metadata in note_metadata_list:
 
                 # Check if the goal is new or has changed state (moved from another notebook)
                 if note_metadata.guid in stored_goal_states[notebook.name]:
@@ -166,9 +173,10 @@ class EvernoteConnector(EvernoteClient):
                         if note_metadata.guid in stored_goal_states[previous_notebook]:
                             # We know the note used to be in this notebook, so annotate the note and update what we know
 
-                            annotation = datetime.now().strftime("%Y-%m-%d") \
-                                         + " Moved from " + previous_notebook + " to " + notebook.name
-                            self.annotate_note(note_metadata.guid,annotation)
+                            annotation = (datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d") \
+                                                        + " Moved from " + previous_notebook \
+                                                        + " to " + notebook.name
+                            self.annotate_note(note_metadata.guid,annotation,False)
 
                             stored_goal_states[previous_notebook].remove(note_metadata.guid)
                             stored_goal_states[notebook.name].append(note_metadata.guid)
@@ -180,12 +188,29 @@ class EvernoteConnector(EvernoteClient):
                         # The note has been newly added
                         # So annotate the note and save the state of the note locally
 
-                        annotation = datetime.now().strftime("%Y-%m-%d") + " Added to " + notebook.name
-                        self.annotate_note(note_metadata.guid,annotation)
+                        annotation = (datetime.now()-timedelta(days=1)).strftime("%Y-%m-%d") \
+                                                        + " Added to " + notebook.name
+                        self.annotate_note(note_metadata.guid,annotation,True)
 
                         stored_goal_states[notebook.name].append(note_metadata.guid)
 
-        self.save_stored_goal_states(stored_goal_states)
+        return stored_goal_states
 
-    def annotate_note(self, note_guid, annotation):
-        print("Annotating note " + note_guid + " with \"" + annotation + "\"")
+
+    def annotate_note(self, note_guid, annotation, add_line_break):
+
+        full_note = self.get_note_store().getNote(self.auth_token, note_guid, True, False, False, False)
+
+        logging.debug("Annotating goal \"" + full_note.title + "\" with \"" + annotation + "\"")
+
+        if add_line_break is True:
+            line_break = "<br clear=\"none\"/>"
+        else:
+            line_break = ""
+
+        full_note.content = full_note.content.replace("</en-note>", line_break + "<div>" + annotation
+                                                      + "</div></en-note>")
+
+        self.get_note_store().updateNote(full_note)
+
+
