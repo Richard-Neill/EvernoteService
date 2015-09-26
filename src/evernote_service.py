@@ -1,4 +1,4 @@
-import settings
+from config import settings
 
 from evernote_connector import EvernoteConnector, EvernoteConnectorException
 from gcalender_connector import GoogleCalendarConnector
@@ -100,7 +100,7 @@ def process_goals():
 def run():
 
     print("Processing Events")
-    process_events()
+    #process_events()
     print("Completed Events Processing")
 
     print("Processing Goals")
