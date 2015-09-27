@@ -31,6 +31,43 @@ def save_successful_check_time(latest_check_time_location,time):
         f.write(str(time))
 
 
+# gets the start of the week in Evernote format
+def get_start_of_week(at_timestamp):
+
+    # The week is Monday 00:00:00 to Sunday 23:59:59
+
+    first_day_of_this_week = at_timestamp - timedelta(days=at_timestamp.weekday())
+
+    start_of_week_timestamp = datetime.strftime(first_day_of_this_week,"%Y%m%dT000000")
+
+    # Need to modify the number per the GMT offset
+    timestamp = datetime.strptime(start_of_week_timestamp.strip(),"%Y%m%dT%H%M%S")
+    corrected_timestamp = timestamp - timedelta(hours=settings.GMT_OFFSET)
+
+    return corrected_timestamp.strftime("%Y%m%dT%H%M%S")
+
+
+# gets the end of the week in Evernote format
+def get_end_of_week(at_timestamp):
+
+    # The week is Monday 00:00:00 to Sunday 23:59:59
+
+    # on Sunday day is 6 so offset is 0
+    # on saturday day is 5 so offset is 1
+
+    day_offset = 6-at_timestamp.weekday()
+
+    last_day_of_this_week = at_timestamp + timedelta(days=day_offset)
+
+    end_of_week_timestamp = datetime.strftime(last_day_of_this_week,"%Y%m%dT235959")
+
+    # Need to modify the number per the GMT offset
+    timestamp = datetime.strptime(end_of_week_timestamp.strip(),"%Y%m%dT%H%M%S")
+    corrected_timestamp = timestamp - timedelta(hours=settings.GMT_OFFSET)
+
+    return corrected_timestamp.strftime("%Y%m%dT%H%M%S")
+
+
 def process_events():
 
     current_check_time = None
@@ -44,7 +81,7 @@ def process_events():
 
         logging.debug("Last successful check was " + last_successful_check_time)
 
-        events = evernote_client.get_new_events(since=last_successful_check_time)
+        events = evernote_client.get_new_events(start_time=last_successful_check_time)
         logging.debug("Evernote connection was successful")
 
     except EvernoteConnectorException as e:
@@ -107,6 +144,38 @@ def run():
     process_goals()
     print("Completed Goals Processing")
 
+
+def summarise_log():
+
+    print("Summarising the log")
+    logging.info("Summarising the daily logs into a weekly log")
+
+    # concatenate all the daily logs for the week
+    # create a new note in weekly logs with that content
+
+    evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN, sandbox=settings.EVERNOTE_SANDBOX_MODE)
+
+    # The week is Monday 00:00:00 to Sunday 23:59:59
+    start_time = get_start_of_week(datetime.now())
+    end_time = get_end_of_week(datetime.now())
+
+    try:
+
+        summary_content = evernote_client.get_concatenated_daily_logs(start_time, end_time)
+
+        first_day_of_this_week = datetime.now() - timedelta(days=datetime.now().weekday())
+        summary_title = datetime.strftime(first_day_of_this_week,"W/C %Y-%m-%d")
+
+        evernote_client.create_summary_log("Summaries", summary_title, summary_content)
+
+        logging.info("Completed summarising the daily logs into a weekly log")
+
+    except EvernoteConnectorException as e:
+        logging.critical("There was an error with the EvernoteConnector: " + e.msg)
+        return
+
+    print("Completed summarising the log")
+
 # Initialise logging
 
 logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL,
@@ -115,6 +184,7 @@ logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL
 
 # Run once when process is started then schedule it to run on its time
 schedule.every().day.at(settings.CHECK_TIME).do(run)
+schedule.every().sunday.at("23:00").do(summarise_log)
 
 try:
     run()

@@ -1,7 +1,7 @@
 from evernote.api.client import EvernoteClient
 from evernote.edam.notestore import NoteStore
 from evernote.edam.notestore.ttypes import NoteFilter
-from evernote.edam.type.ttypes import NoteSortOrder
+from evernote.edam.type.ttypes import NoteSortOrder, Note
 from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
 
 from datetime import datetime, timedelta
@@ -85,7 +85,7 @@ class EvernoteConnector(EvernoteClient):
 
         return Event(split_title[2], date_timestamp, start_timestamp, end_timestamp, event_note.content, location)
 
-    def get_new_event_note_filter(self,since,notebook_name):
+    def get_note_filter(self,start_time,notebook_name,end_time=None):
 
         for notebook in self.get_note_store().listNotebooks():
             if notebook.name == notebook_name:
@@ -99,7 +99,10 @@ class EvernoteConnector(EvernoteClient):
         note_filter.order = NoteSortOrder.CREATED
         note_filter.ascending = True
         note_filter.notebookGuid = event_notebook_guid
-        note_filter.words = "created:" + since + "Z"
+        if end_time is None:
+            note_filter.words = "created:" + start_time + "Z"
+        else:
+            note_filter.words = "created:" + start_time + "Z -" + end_time
 
         return note_filter
 
@@ -224,4 +227,60 @@ class EvernoteConnector(EvernoteClient):
 
         self.get_note_store().updateNote(full_note)
 
+    def create_summary_log(self,notebook_name,title,content):
 
+        new_note = Note()
+        new_note.title = title
+        new_note.content = content
+
+        notebook_guid = None
+        for notebook in self.get_note_store().listNotebooks():
+            if notebook.name == notebook_name:
+                notebook_guid = notebook.guid
+                break
+
+        if notebook_guid is None:
+            raise EvernoteConnectorException("Cannot find notebook called " + notebook_name)
+
+        new_note.notebookGuid = notebook_guid
+
+        try:
+            note = self.get_note_store().createNote(self.auth_token, new_note)
+
+        except (EDAMUserException, EDAMNotFoundException) as e:
+            raise EvernoteConnectorException(e)
+
+
+    def get_concatenated_daily_logs(self, start_time, end_time):
+
+        try:
+
+            check_if_valid_evernote_time(start_time)
+            check_if_valid_evernote_time(end_time)
+
+            new_event_note_filter = self.get_note_filter(start_time,"Daily",end_time)
+
+            note_metadata_list = self.get_note_store().findNotesMetadata(self.auth_token, new_event_note_filter, 0, 10, NoteStore.NotesMetadataResultSpec())
+
+            logging.debug("Found " + str(len(note_metadata_list.notes)) + " daily logs to summarise")
+
+            concatenated_logs = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE en-note SYSTEM \"http://xml.evernote.com/pub/enml2.dtd\"><en-note>"
+            for note_metadata in note_metadata_list.notes:
+
+                full_note = self.get_note_store().getNote(self.auth_token, note_metadata.guid, True, False, False, False)
+
+                split_content = full_note.content.split("<en-note>")
+
+                if len(split_content) != 2:
+                    split_content = full_note.content.split(";\">",1)
+
+                split_content = split_content[1].split("</en-note>")
+
+                concatenated_logs = concatenated_logs + split_content[0]
+
+            return concatenated_logs + "</en-note>"
+
+        except (EDAMUserException, EDAMSystemException, EDAMNotFoundException) as e:
+            # currently I am not managing what to do if the API call is bad
+            # I will need to consider things like rate limiting and token expiry
+            raise EvernoteConnectorException(e)

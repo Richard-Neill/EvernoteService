@@ -1,6 +1,7 @@
-This project manages my Evernote notebooks and (currently has 2 main objectives):
+This project manages my Evernote notebooks and (currently has 3 main objectives):
 * Take any events which I add as new notes to Evernote in the 'Events' notebook, and create corresponding google calender events, so that my calender stays synchronised even if I only interface with Evernote.
 * Automatically update my goals with their state-changes, e.g. if I move a note from the 'Backlog' to 'Current', I want this service to append the note with the date that this happened (so I know I started working on that goal on that date)
+* Automatically combine all my daily logs into a weekly 'summary of work', running every Sunday night
 
 A secondary goal is to remind me how to code in python, as well as improve my knowledge on the infrastructure (unit testing frameworks, logging, schedulers, IDEs, packaging etc)
 
