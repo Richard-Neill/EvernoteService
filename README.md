@@ -10,8 +10,15 @@ Setup process on Windows:
 * Run 'pip install --upgrade google-api-python-client'
 * Run 'pip install schedule'
 
-To run the service it is just:
-* python evernote_service.py
+To run the service I run from the NoteService directory:
+* nohup sudo python -m src.evernote_service &
+
+For events to be synced to google calender, they must be of the form:
+
+Title: "yyyy-mm-dd HHMM-HHMM [Event Name]"
+Optional first line of content: "Location: [Location]"
+
+(The [] symbols are not required)
 
 The settings.py file must be placed in config/ and be of the form:
 

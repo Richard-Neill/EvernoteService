@@ -15,12 +15,13 @@ def check_if_valid_evernote_time(time_string):
 
 
 class Event():
-    def __init__(self, title, date, start_time, end_time, content):
+    def __init__(self, title, date, start_time, end_time, content, location):
         self.title = title
         self.date = date
         self.start_time = start_time
         self.end_time = end_time
         self.content = content
+        self.location = location
 
 
 class EvernoteConnectorException(Exception):
@@ -72,7 +73,17 @@ class EvernoteConnector(EvernoteClient):
         start_timestamp = datetime.strptime(split_title[0] + " " + start_string, '%Y-%m-%d %H%M')
         end_timestamp = datetime.strptime(split_title[0] + " " + end_string, '%Y-%m-%d %H%M')
 
-        return Event(split_title[2], date_timestamp, start_timestamp, end_timestamp, event_note.content)
+        location = None
+
+        split_location = event_note.content.split("<div>",1)
+        if len(split_location) == 2:
+            split_location = split_location[1].split("</div>",1)
+            if len(split_location) == 2:
+                split_location = split_location[0].split("Location:",1)
+                if len(split_location) == 2:
+                    location = split_location[1].strip()
+
+        return Event(split_title[2], date_timestamp, start_timestamp, end_timestamp, event_note.content, location)
 
     def get_new_event_note_filter(self,since,notebook_name):
 

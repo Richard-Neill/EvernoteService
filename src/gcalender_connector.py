@@ -64,6 +64,7 @@ class GoogleCalendarConnector():
             content = child.text
 
         event_description = {'summary': event.title,
+                             'location': event.location,
                              'description': content,
                              'start': start,
                              'end': end
