@@ -81,7 +81,7 @@ def process_events():
 
         logging.debug("Last successful check was " + last_successful_check_time)
 
-        events = evernote_client.get_new_events(start_time=last_successful_check_time)
+        events = evernote_client.get_new_events(since=last_successful_check_time)
         logging.debug("Evernote connection was successful")
 
     except EvernoteConnectorException as e:
