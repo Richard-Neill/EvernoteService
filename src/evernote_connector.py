@@ -82,8 +82,11 @@ class EvernoteConnector(EvernoteClient):
                 split_location = split_location[0].split("Location:",1)
                 if len(split_location) == 2:
                     location = split_location[1].strip()
+					
+		location = location.replace("&nbsp;"," ")
+		title = split_title[2].replace("&nbsp;"," ")
 
-        return Event(split_title[2], date_timestamp, start_timestamp, end_timestamp, event_note.content, location)
+        return Event(title, date_timestamp, start_timestamp, end_timestamp, event_note.content, location)
 
     def get_note_filter(self,start_time,notebook_name,end_time=None):
 
