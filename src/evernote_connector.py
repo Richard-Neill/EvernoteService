@@ -73,7 +73,7 @@ class EvernoteConnector(EvernoteClient):
         start_timestamp = datetime.strptime(split_title[0] + " " + start_string, '%Y-%m-%d %H%M')
         end_timestamp = datetime.strptime(split_title[0] + " " + end_string, '%Y-%m-%d %H%M')
 
-        location = None
+        location = ""
 
         split_location = event_note.content.split("<div>",1)
         if len(split_location) == 2:
