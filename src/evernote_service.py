@@ -181,7 +181,6 @@ def summarise_log():
 logging.basicConfig(filename=settings.LOG_LOCATION, level=settings.LOGGING_LEVEL,
                     format='%(asctime)s [%(levelname)s]: %(message)s')
 
-
 # Run once when process is started then schedule it to run on its time
 schedule.every().day.at(settings.CHECK_TIME).do(run)
 schedule.every().sunday.at("23:00").do(summarise_log)
