@@ -2,6 +2,7 @@ from config import settings
 
 from evernote_connector import EvernoteConnector, EvernoteConnectorException
 from gcalender_connector import GoogleCalendarConnector
+from mendeley_connector import MendeleyConnector
 import schedule
 import time
 
@@ -134,16 +135,34 @@ def process_goals():
     save_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION,new_goal_states)
     logging.info("Completed processing goals")
 
+def process_mendeley():
+
+    mendeley_client = MendeleyConnector(settings.MENDELEY_CREDENTIALS_FILE)
+    mendeley_client.test()
+    #previous_goal_states = get_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION)
+
+    #logging.info("Processing goal state-changes")
+    #evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
+    #new_goal_states = evernote_client.process_goal_updates(previous_goal_states)
+
+    #save_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION,new_goal_states)
+    #logging.info("Completed processing goals")
+
 def run():
 
     print("Processing Events")
-    process_events()
+    #process_events()
     print("Completed Events Processing")
 
     print("Processing Goals")
-    process_goals()
+    #process_goals()
     print("Completed Goals Processing")
+    
+    print("Processing Mendeley")
+    process_mendeley()
+    print("Completed Mendeley Processing")
 
+    print("Waiting for next execution")
 
 def summarise_log():
 
@@ -192,6 +211,6 @@ try:
 except Exception as e:
     logging.critical("There was a general error.")
     #logging.critical(e.msg)
-    print e
+    print "Error is: " + str(e)
     exit(1)
 
