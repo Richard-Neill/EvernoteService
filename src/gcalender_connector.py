@@ -19,21 +19,37 @@ class GoogleCalendarConnector():
         with open(credentials_file) as credentials:
             secrets = json.load(credentials)
 
-        client_id = secrets['client_id']
-        client_secret = secrets['client_secret']
+        if "web" in secrets:
+            # The credentials file is pre-authorisation
+            client_id = secrets['web']['client_id']
+            client_secret = secrets['web']['client_secret']
+        else:
+            client_id = secrets['client_id']
+            client_secret = secrets['client_secret']
         scope = 'https://www.googleapis.com/auth/calendar'
 
         flow = OAuth2WebServerFlow(client_id, client_secret, scope)
 
         parser = argparse.ArgumentParser(parents=[tools.argparser])
-        flags = parser.parse_args(args=[])
+        flags = parser.parse_args()
 
         storage = Storage(credentials_file)
-        credentials = storage.get()
-        if credentials is None or credentials.invalid:
-            credentials = tools.run_flow(flow, storage, flags)
 
-        http = credentials.authorize(httplib2.Http())
+        gcredentials = None
+        try:
+            gcredentials = storage.get()
+        except Exception as e:
+            logging.debug("No authorised google credentials found.")
+            pass
+
+        if gcredentials is None:
+            gcredentials = tools.run_flow(flow, storage, flags)
+        elif gcredentials.invalid:
+            logging.debug("The authorised google credentials are invalid.")
+            gcredentials = tools.run_flow(flow, storage, flags)
+
+        storage.put(gcredentials)
+        http = gcredentials.authorize(httplib2.Http())
         self.service = discovery.build('calendar', 'v3', http=http)
 
         logging.debug('Successfully authenticated with Google and created service object')

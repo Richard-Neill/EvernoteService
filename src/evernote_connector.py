@@ -57,6 +57,9 @@ class EvernoteConnector(EvernoteClient):
         except (EDAMUserException, EDAMSystemException, EDAMNotFoundException) as e:
             # currently I am not managing what to do if the API call is bad
             # I will need to consider things like rate limiting and token expiry
+            logging.debug("Exception here.")
+            print e
+            exit(1)
             raise EvernoteConnectorException(e)
 
 

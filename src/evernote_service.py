@@ -153,13 +153,12 @@ def summarise_log():
     # concatenate all the daily logs for the week
     # create a new note in weekly logs with that content
 
-    evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN, sandbox=settings.EVERNOTE_SANDBOX_MODE)
-
     # The week is Monday 00:00:00 to Sunday 23:59:59
     start_time = get_start_of_week(datetime.now())
     end_time = get_end_of_week(datetime.now())
 
     try:
+        evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN, sandbox=settings.EVERNOTE_SANDBOX_MODE)
 
         summary_content = evernote_client.get_concatenated_daily_logs(start_time, end_time)
 
@@ -191,7 +190,8 @@ try:
         schedule.run_pending()
         time.sleep(1)
 except Exception as e:
-    logging.critical("There was a general error:")
-    logging.critical(e)
+    logging.critical("There was a general error.")
+    #logging.critical(e.msg)
+    print e
     exit(1)
 
