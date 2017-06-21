@@ -43,4 +43,5 @@ LOG_LOCATION = os.path.join(APP_ROOT, "log", "evernote_service.log")
 STORED_GOAL_STATES_LOCATION = os.path.join(APP_ROOT, "config", "stored_goal_states.json")
 LATEST_CHECK_TIME_LOCATION = os.path.join(APP_ROOT, "config", "last_check_time.txt")
 GOOGLE_CREDENTIALS_FILE = os.path.join(APP_ROOT, "config", "google_oauth2.creds")
+MENDELEY_CREDENTIALS_FILE = os.path.join(APP_ROOT, "config", "mendeley_oauth2.creds")
 ```
