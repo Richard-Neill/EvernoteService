@@ -1,8 +1,6 @@
 settings.py
-last_check_time.txt
-
+*check_time.txt
 test*
-
 *.creds*
 *.authenticated*
 *.pyc

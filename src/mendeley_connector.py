@@ -11,6 +11,7 @@ import logging
 
 import os
 from datetime import datetime
+from unidecode import unidecode
 
 from mendeley import Mendeley, MendeleyClientCredentialsAuthenticator 
 from mendeley.session import MendeleySession
@@ -89,19 +90,50 @@ class MendeleyConnector():
 
         logging.debug('Successfully authenticated with Mendeley and created service object')
 
-    def test(self):
+    def get_new_documents(self,since):
     
-        logging.debug('Testing')
+        documents = []
 
-        docs = self.session.documents.iter()
+        docs = self.session.documents.iter(view='tags')
         for doc in docs:
-            print doc.title
 
+            if doc.tags != None and "mendeley" in doc.tags:
+                print "Skipping " + doc.title
+                continue
 
-        # doc has:
-        # "authors"
-        # "title"
-        # "created"
-        # "year"
+            if doc.created.naive > since:
+
+                authors = []
+                if doc.authors != None:
+                    for author in doc.authors:
+                        first = ""
+                        second = ""
+                        if author.first_name != None:
+                            first = unidecode(author.first_name)
+                        if author.last_name != None:
+                            second = unidecode(author.last_name)
+
+                        authors.append({"first":first,"second":second})
+
+                title = ""
+                source = ""
+                if doc.title != None:
+                    title = unidecode(doc.title)
+                if doc.source != None:
+                    source = unidecode(doc.source)
+
+                documents.append(
+                    {
+                        "title":title,
+                        "source":source,
+                        "year":doc.year,
+                        "authors":authors
+                    }
+
+                )
+
+        print "Number of docs: " + str(len(documents))
+        return documents
+
 
 

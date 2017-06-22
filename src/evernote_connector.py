@@ -1,10 +1,11 @@
 from evernote.api.client import EvernoteClient
 from evernote.edam.notestore import NoteStore
 from evernote.edam.notestore.ttypes import NoteFilter
-from evernote.edam.type.ttypes import NoteSortOrder, Note
+from evernote.edam.type.ttypes import NoteSortOrder, Note, Tag
 from evernote.edam.error.ttypes import EDAMUserException, EDAMSystemException, EDAMNotFoundException
 
 from datetime import datetime, timedelta
+from time import sleep
 import logging
 
 def check_if_valid_evernote_time(time_string):
@@ -290,3 +291,102 @@ class EvernoteConnector(EvernoteClient):
             # currently I am not managing what to do if the API call is bad
             # I will need to consider things like rate limiting and token expiry
             raise EvernoteConnectorException(e)
+
+    def add_new_mendeley_docs(self,docs):
+
+        notebook_name = "Literature"
+        all_tags = self.get_note_store().listTags()
+
+        authors_group_guid = None
+        for tag in all_tags:
+            if "author" in tag.name.lower():
+                authors_group_guid = tag.guid
+
+        if authors_group_guid is None:
+            logging.critical("Can't find 'Authors' tag")
+            exit(1)
+
+        total_num_docs = len(docs)
+        processed_counter = -1
+        for doc in docs:
+
+            processed_counter += 1
+            logging.debug("Adding Mendeley document " + str(processed_counter) + "/" + str(total_num_docs) + " to evernote.")
+
+            attempts = 0
+            while True:
+
+                all_tags = self.get_note_store().listTags()
+                try:
+                    new_note = Note()
+                    new_note.title = doc["title"].replace("&","&amp;");
+                    
+                    notebook_guid = None
+                    for notebook in self.get_note_store().listNotebooks():
+                        if notebook.name == notebook_name:
+                            notebook_guid = notebook.guid
+                            break
+
+                    if notebook_guid is None:
+                        raise EvernoteConnectorException("Cannot find notebook called " + notebook_name)
+
+                    new_note.notebookGuid = notebook_guid
+
+                    authors_concatenated = ""
+                    tag_guids_to_add_to_note = []
+
+                    newly_created_authors = {}
+                    for author in doc["authors"]:
+                    
+                        author_name = ""
+                        if len(author["first"]) > 0:        
+                            author_name = author["first"][0] + ". "
+                        if len(author["second"]) > 0:
+                            author_name = author_name + author["second"]
+
+                        authors_concatenated = authors_concatenated + author["first"] + " " + author["second"] + "<br/>"
+
+                        author_tag_guid = None
+
+                        # try to find the author tag if it already exists
+                        for tag in all_tags:
+                            if tag.name.lower() == author_name.lower():
+                                author_tag_guid = tag.guid
+                                break
+                        
+                        # (this is necessary in case the author is repeated in the paper)
+                        if author_name in newly_created_authors:
+                            author_tag_guid = newly_created_authors[author_name]
+
+                        # otherwise, create it
+                        if author_tag_guid is None:
+                            logging.debug("Creating tag for " + author_name)
+                            new_tag = Tag()
+                            new_tag.name = author_name
+                            new_tag.parentGuid = authors_group_guid
+                            author_tag_guid = self.get_note_store().createTag(new_tag).guid
+                            newly_created_authors[author_name] = author_tag_guid
+
+                        tag_guids_to_add_to_note.append(author_tag_guid)
+
+                    new_note.tagGuids = tag_guids_to_add_to_note
+                    
+                    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE en-note SYSTEM \"http://xml.evernote.com/pub/enml2.dtd\"><en-note>Year = " + str(doc["year"]) + ", Source = " + str(doc["source"]) + "<br/><br/>Authors:<br/>" + authors_concatenated + "</en-note>"
+
+                    new_note.content = content.replace("&","&amp;");
+
+                    note = self.get_note_store().createNote(self.auth_token, new_note)
+                    sleep(5)
+                    break
+
+                except (EDAMUserException, EDAMNotFoundException) as e:
+                    raise EvernoteConnectorException(e)
+                except (EDAMSystemException) as ex:
+                    if(attempts == 5):
+                        logging.critical("Tried to insert note 5 times, but keep getting exception: " + str(ex))
+                        exit(1)
+                    else:
+                        attempts += 1
+                        logging.info("Attempt " + str(attempts) + " has returned rate limit error, waiting for " + str(ex.rateLimitDuration) + " seconds")
+                        sleep(ex.rateLimitDuration + 1)
+

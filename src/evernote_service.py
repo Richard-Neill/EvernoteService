@@ -78,7 +78,7 @@ def process_events():
     evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
     try:
         current_check_time = datetime.now().strftime("%Y%m%dT%H%M%S")
-        last_successful_check_time = get_last_successful_check_time(settings.LATEST_CHECK_TIME_LOCATION)
+        last_successful_check_time = get_last_successful_check_time(settings.LATEST_EVERNOTE_CHECK_TIME_LOCATION)
 
         logging.debug("Last successful check was " + last_successful_check_time)
 
@@ -103,7 +103,7 @@ def process_events():
         google_client = GoogleCalendarConnector(credentials_file=settings.GOOGLE_CREDENTIALS_FILE)
         google_client.add_new_events(events)
 
-    save_successful_check_time(settings.LATEST_CHECK_TIME_LOCATION,current_check_time)
+    save_successful_check_time(settings.LATEST_EVERNOTE_CHECK_TIME_LOCATION,current_check_time)
     logging.info('Completed processing events, saved check time as ' + current_check_time)
 
 def get_stored_goal_states(stored_states_location):
@@ -137,25 +137,35 @@ def process_goals():
 
 def process_mendeley():
 
+    current_check_time = datetime.now().strftime("%Y%m%dT%H%M%S")
+    last_successful_check_time = get_last_successful_check_time(settings.LATEST_MENDELEY_CHECK_TIME_LOCATION)
+
+    # Get the list of new documents according to last check time
     mendeley_client = MendeleyConnector(settings.MENDELEY_CREDENTIALS_FILE)
-    mendeley_client.test()
-    #previous_goal_states = get_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION)
 
-    #logging.info("Processing goal state-changes")
-    #evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
-    #new_goal_states = evernote_client.process_goal_updates(previous_goal_states)
+    last_check_datetime = datetime.strptime(last_successful_check_time, '%Y%m%dT%H%M%S')
 
-    #save_stored_goal_states(settings.STORED_GOAL_STATES_LOCATION,new_goal_states)
-    #logging.info("Completed processing goals")
+    docs = mendeley_client.get_new_documents(since=last_check_datetime)
+    mendeley_client = None
+
+    if len(docs) > 0:
+
+        # Add each document as a new note in Evernote
+        logging.info("Adding " + str(len(docs)) + " mendeley docs to Evernote")
+        evernote_client = EvernoteConnector(token=settings.EVERNOTE_AUTH_TOKEN,sandbox=settings.EVERNOTE_SANDBOX_MODE)
+        evernote_client.add_new_mendeley_docs(docs)
+
+    save_successful_check_time(settings.LATEST_MENDELEY_CHECK_TIME_LOCATION,current_check_time)
+    logging.info('Completed processing mendeley docs, saved check time as ' + current_check_time)
 
 def run():
 
     print("Processing Events")
-    #process_events()
+    process_events()
     print("Completed Events Processing")
 
     print("Processing Goals")
-    #process_goals()
+    process_goals()
     print("Completed Goals Processing")
     
     print("Processing Mendeley")
@@ -210,7 +220,9 @@ try:
         time.sleep(1)
 except Exception as e:
     logging.critical("There was a general error.")
-    #logging.critical(e.msg)
-    print "Error is: " + str(e)
+    if hasattr(e,'msg'):
+        logging.critical(e.msg)
+    else:
+        logging.critical(str(e))
     exit(1)
 
