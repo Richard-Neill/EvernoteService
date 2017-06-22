@@ -3,8 +3,8 @@ last_check_time.txt
 
 test*
 
-*.creds
-*.authenticated
+*.creds*
+*.authenticated*
 *.pyc
 .idea*
 *.log

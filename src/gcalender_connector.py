@@ -33,7 +33,7 @@ class GoogleCalendarConnector():
         parser = argparse.ArgumentParser(parents=[tools.argparser])
         flags = parser.parse_args()
 
-        storage = Storage(credentials_file)
+        storage = Storage(credentials_file + ".authenticated")
 
         gcredentials = None
         try:

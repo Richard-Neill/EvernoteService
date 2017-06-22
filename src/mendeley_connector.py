@@ -9,9 +9,13 @@ import httplib2
 import json
 import logging
 
+import os
+from datetime import datetime
+
 from mendeley import Mendeley, MendeleyClientCredentialsAuthenticator 
 from mendeley.session import MendeleySession
-from mendeley.auth import MendeleyClientCredentialsTokenRefresher
+from mendeley.auth import MendeleyClientCredentialsTokenRefresher,MendeleyAuthorizationCodeTokenRefresher
+from mendeley.exception import MendeleyApiException
 
 TIMEZONE_OFFSET = '+01'
 
@@ -38,6 +42,7 @@ class MendeleyConnector():
         storage = Storage(str(credentials_file) + ".authenticated")
 
         mcredentials = None
+        previous_creds = False
         try:
             mcredentials = storage.get()
         except Exception as e:
@@ -49,19 +54,38 @@ class MendeleyConnector():
         elif mcredentials.invalid:
             logging.debug("The authorised mendeley credentials are invalid.")
             mcredentials = tools.run_flow(flow, storage, flags)
+        else:
+            previous_creds = True
 
-        storage.put(mcredentials)
+        if previous_creds is False:
+            storage.put(mcredentials)
 
         # Now create the mendeley session with the access token
         self.mendeley = Mendeley(secrets['web']['client_id'], secrets['web']['client_secret'],secrets['web']['redirect_uris'][0])
         auth = MendeleyClientCredentialsAuthenticator(self.mendeley)
-
+        
         creds = {"access_token": mcredentials.access_token, "refresh_token": mcredentials.refresh_token}
 
         self.session = MendeleySession(self.mendeley,
-           creds,
-           client=auth.client,
-           refresher=MendeleyClientCredentialsTokenRefresher(auth))
+            creds,
+            client=auth.client,
+            refresher=MendeleyClientCredentialsTokenRefresher(auth))
+        
+        time_now = datetime.now()
+
+        if time_now >= mcredentials.token_expiry:
+            logging.debug("Mendeley access token has expired. Refreshing...")
+
+            refresher = MendeleyAuthorizationCodeTokenRefresher(auth)
+            refresher.refresh(self.session)
+
+            mcredentials.access_token = self.session.token["access_token"]
+            mcredentials.refresh_token = self.session.token["refresh_token"]
+
+            expiry = datetime.fromtimestamp(self.session.token["expires_at"])
+            mcredentials.token_expiry = expiry
+
+            storage.put(mcredentials)
 
         logging.debug('Successfully authenticated with Mendeley and created service object')
 
@@ -73,10 +97,11 @@ class MendeleyConnector():
         for doc in docs:
             print doc.title
 
-            # doc has:
-            # "authors"
-            # "title"
-            # "created"
-            # "year"
+
+        # doc has:
+        # "authors"
+        # "title"
+        # "created"
+        # "year"
 
 
